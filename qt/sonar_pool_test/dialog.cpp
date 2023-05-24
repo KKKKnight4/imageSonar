@@ -12,6 +12,139 @@
 #include <QMessageBox>
 #include <QTime>
 
+using namespace std;
+
+void Dialog::plot(char *name){
+
+    short int data[64*2048];
+    float data_all[64*2048];
+    float data_real[32*2048];
+    float data_image[32*2048];
+    QVector<double> real;
+    QVector<double> image;
+    QVector<double> x;
+    QVector<double> y;
+    QVector<double> ft;
+
+    //
+    for(int i=0;i<2048;i++)
+        x.push_back(i/10000.0);
+
+    //读数据
+    FILE *fid;
+    fid = fopen(name, "rb");
+    fread(data,sizeof(short int),64*2048,fid);
+    fclose(fid);
+
+    //调整幅度
+    for(int i=0;i<64*2048;i++)
+        data_all[i]=data[i]*3*4.04*1000/65536;
+
+
+    //UTP
+
+    //分离实虚
+    for(int i=0;i<32*2048;i++){
+        data_real[i]=data_all[i*2];
+        data_image[i]=data_all[i*2+1];
+    }
+
+    //取出第一组数据
+    for(int i=0;i<2048;i++){
+        real.push_back(data_real[32*i]);
+        image.push_back(data_image[32*i]);
+    }
+
+    //fft的数据处理
+    int N=2048;
+    complex<double> f[2048];
+    complex<double> F[2048];
+    for(int i=0;i<2048;i++){
+        complex<double> val(data_real[32*i], data_image[32*i]);
+        f[i]=val;
+    }
+
+    complex<double> *p_f=f;
+    complex<double> *p_F=F;
+    fft(p_f,N,p_F);
+
+
+    for(int i=0;i<2048;i++)
+        ft.push_back(abs(F[i])/2048);
+
+
+    double df=10000.0/2048;
+
+    for(int i=0;i<2048;i++){
+        y.push_back((i-1024)*df);
+    }
+    for(int i=0;i<1024;i++){
+        double temp=ft[i];
+        ft[i]=ft[i+1024];
+        ft[i+1024]=temp;
+    }
+    auto m=max_element(ft.begin(),ft.end());
+    double mm = *m;
+
+
+
+    //绘制曲线
+    QwtPlotCurve *curvep_real =new QwtPlotCurve;
+    QwtPlotCurve *curvep_image =new QwtPlotCurve;
+    QwtPlotCurve *curvep_fft =new QwtPlotCurve;
+    curvep_real->setPen(Qt::black, 1);
+    curvep_image->setPen(Qt::black, 1);
+    curvep_fft->setPen(Qt::black, 1);
+
+    //清除画布上原有的图像
+    ui->plot_real->detachItems();
+    ui->plot_image->detachItems();
+    ui->plot_fft->detachItems();
+
+    QwtPointArrayData * const line_real = new QwtPointArrayData(x,real);
+    QwtPointArrayData * const line_image = new QwtPointArrayData(x,image);
+    QwtPointArrayData * const line_fft = new QwtPointArrayData(y,ft);
+
+
+    //设置图像范围
+
+    ui->plot_real->setTitle("实部 时频图");
+    ui->plot_real->setAxisScale(QwtPlot::xBottom,0,0.2048,0.04);
+    ui->plot_real->setAxisScale(QwtPlot::yLeft,-2000,2000,1000);
+    ui->plot_image->setTitle("虚部 时频图");
+    ui->plot_image->setAxisScale(QwtPlot::xBottom,0,0.2048,0.04);
+    ui->plot_image->setAxisScale(QwtPlot::yLeft,-2000,2000,1000);
+    ui->plot_fft->setTitle("频域图");
+    ui->plot_fft->setAxisScale(QwtPlot::xBottom,-5000,5000,1000);
+    ui->plot_fft->setAxisScale(QwtPlot::yLeft,-100,mm);
+
+
+    //设置曲线的数据
+    curvep_real->setPen(QColor(Qt::black),2);
+    curvep_real->setStyle(QwtPlotCurve::Steps);
+    curvep_real->setCurveAttribute(QwtPlotCurve::Fitted, true);
+    curvep_real->setData(line_real);
+    curvep_real->attach(ui->plot_real);
+
+    curvep_image->setPen(QColor(Qt::black),2);
+    curvep_image->setStyle(QwtPlotCurve::Steps);
+    curvep_image->setCurveAttribute(QwtPlotCurve::Fitted, true);
+    curvep_image->setData(line_image);
+    curvep_image->attach(ui->plot_image);
+
+    curvep_fft->setPen(QColor(Qt::black),2);
+    curvep_fft->setStyle(QwtPlotCurve::Steps);
+    curvep_fft->setCurveAttribute(QwtPlotCurve::Fitted, true);
+    curvep_fft->setData(line_fft);
+    curvep_fft->attach(ui->plot_fft);
+
+
+    ui->plot_real->replot();
+    ui->plot_image->replot();
+    ui->plot_fft->replot();
+}
+
+
 void sleep(unsigned int msec){
 //currnentTime 返回当前时间 用当前时间加上我们要延时的时间msec得到一个新的时刻
     QTime reachTime = QTime::currentTime().addMSecs(msec);
@@ -32,7 +165,7 @@ Dialog::Dialog(QWidget *parent)
     file = new QFile();
     stream = new QDataStream();
 
-
+    //plot("data.dat");
     //初始化Udp
     socket->bind(QHostAddress::Any, 1234);  //端口设为1234
     QObject::connect(socket, &QUdpSocket::readyRead, this, &Dialog::socket_Read_Data,Qt::QueuedConnection);
@@ -66,6 +199,8 @@ void Dialog::socket_Read_Data()
     static int flag_file = 0;//文件创建成功标志
     static int file_len = 0;//缓冲区数据长度
     static int file_wr_cnt = 0;//存储数据长度
+    static string temp;
+
 
     //len：缓冲区数据个数
     int len = socket->bytesAvailable();
@@ -88,6 +223,7 @@ void Dialog::socket_Read_Data()
         QDateTime current_date_time =QDateTime::currentDateTime();
         QString current_date =current_date_time.toString("yyyyMMdd-hhmmss");
         QString str = ".\\..\\data\\"  + current_date ;
+        temp=str.toStdString()+".dat";
         file->setFileName(str+".dat");
         stream->setDevice(file);
         if(!file->open(QIODevice::WriteOnly))
@@ -101,7 +237,10 @@ void Dialog::socket_Read_Data()
         char* buf = byteArray.data();
         stream->writeRawData(buf,byteArray.length());
         file_wr_cnt += byteArray.length();
-        if(file_wr_cnt == file_len){
+        if(file_wr_cnt == file_len){ 
+            char *name=const_cast<char *>(temp.data());
+            plot(name);
+
             flag_file = 0;
             file_len = 0;
             file_wr_cnt = 0;

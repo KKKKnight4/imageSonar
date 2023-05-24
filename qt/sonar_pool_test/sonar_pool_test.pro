@@ -17,11 +17,13 @@ DEFINES += QT_DEPRECATED_WARNINGS
 #DEFINES += QT_DISABLE_DEPRECATED_BEFORE=0x060000    # disables all the APIs deprecated before Qt 6.0.0
 
 SOURCES += \
+    fft.cpp \
     main.cpp \
     dialog.cpp
 
 HEADERS += \
-    dialog.h
+    dialog.h \
+    fft.h
 
 FORMS += \
     dialog.ui
@@ -30,3 +32,10 @@ FORMS += \
 qnx: target.path = /tmp/$${TARGET}/bin
 else: unix:!android: target.path = /opt/$${TARGET}/bin
 !isEmpty(target.path): INSTALLS += target
+
+win32:CONFIG(release, debug|release): LIBS += -L$$PWD/../../../../../../010Qt/5.13.1/mingw73_32/lib/ -lqwt
+else:win32:CONFIG(debug, debug|release): LIBS += -L$$PWD/../../../../../../010Qt/5.13.1/mingw73_32/lib/ -lqwtd
+else:unix: LIBS += -L$$PWD/../../../../../../010Qt/5.13.1/mingw73_32/lib/ -lqwt
+
+INCLUDEPATH += $$PWD/../../../../../../010Qt/5.13.1/mingw73_32/include/Qwt
+DEPENDPATH += $$PWD/../../../../../../010Qt/5.13.1/mingw73_32/include/Qwt

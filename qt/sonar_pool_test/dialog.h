@@ -8,7 +8,20 @@
 #include <QUdpSocket>
 #include <QList>
 #include <QTimer>
-
+#include <fft.h>
+#include <QtMath>
+#include <QPoint>
+#include <QMessageBox>
+#include <QTime>
+#include <QVector>
+#include <qwt_plot_curve.h>
+#include <qwt_plot.h>
+#include <qwt_point_data.h>
+#include <qwt_plot_canvas.h>
+#include <qwt_plot_panner.h>
+#include <qwt_plot_magnifier.h>
+#include <qwt_matrix_raster_data.h>
+#include <QDataStream>
 QT_BEGIN_NAMESPACE
 namespace Ui { class Dialog; }
 QT_END_NAMESPACE
@@ -40,7 +53,7 @@ private slots:
     void on_btnWorkModeTest_clicked();
     void on_btnStop_clicked();
     void on_pushButton_clicked();
-
+    void plot(char *name);
 
 private:
     Ui::Dialog *ui;
